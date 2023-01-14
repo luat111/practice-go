@@ -4,60 +4,80 @@ import (
 	"context"
 	"errors"
 	"example/web-service-gin/database"
+	"example/web-service-gin/utils"
 
-	"github.com/goonode/mogo"
+	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Userservice is to handle user relation database query
-type Userservice struct{}
+type IUserService interface {
+	Create(user *User) (*User, error)
+	GetOne(id string) (*User, error)
+	FindByEmail(email string) (*User, error)
+}
 
-// Create is to register new user
-func (userservice Userservice) Create(user *(User)) error {
+type UserService struct{}
+
+func (userservice UserService) Create(user *(User)) (*User, error) {
 	db := database.GetConnection().Collection("user")
 
-	result :=  db.FindOne(context.TODO(), bson.D{{"email", user.Email}})
+	var checkExisted User
+	err := db.FindOne(context.TODO(), bson.M{"email": user.Email}).Decode(&checkExisted)
 
-	if result != nil {
-		return errors.New("User existed!")
+	if checkExisted.Id != "" {
+		return nil, errors.New("User existed!")
 	}
 
 	result, err := db.InsertOne(context.TODO(), user)
-	if vErr, ok := err.(*mogo.ValidationError); ok {
-		return vErr
+	if err != nil {
+		return nil, err
 	}
-	return err
+
+	user.Id = result.InsertedID.(primitive.ObjectID).Hex()
+
+	return user, nil
 }
 
-// Delete a user from database
-func (userservice Userservice) Delete(email string) error {
-	user, _ := userservice.FindByEmail(email)
-	conn := database.GetConnection()
-	defer conn.Session.Close()
-	err := user.Remove()
-	return err
-}
+func (userservice UserService) GetOne(id string) (*User, error) {
+	db := database.GetConnection().Collection("user")
 
-// Find user
-func (userservice Userservice) Find(user *(User)) (*User, error) {
-	conn := database.GetConnection()
-	defer conn.Session.Close()
-
-	doc := mogo.NewDoc(User{}).(*(User))
-	err := doc.FindOne(bson.M{"email": user.Email}, doc)
+	var user User
+	err := db.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&user)
 
 	if err != nil {
 		return nil, err
 	}
-	return doc, nil
+
+	if user.Id != "" {
+		return nil, errors.New("Not found record!")
+	}
+
+	return &user, nil
 }
 
-// Find user from email
-func (userservice Userservice) FindByEmail(email string) (*User, error) {
-	conn := database.GetConnection()
-	defer conn.Session.Close()
+func (userservice UserService) FindByEmail(email string) (*User, error) {
+	db := database.GetConnection().Collection("user")
 
-	user := new(User)
-	user.Email = email
-	return userservice.Find(user)
+	var user User
+	err := db.FindOne(context.TODO(), bson.M{"email": email}).Decode(&user)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Id == "" {
+		return nil, errors.New("Not found record!")
+	}
+
+	return &user, nil
+}
+
+func (userservice UserService) GetJwtToken(email string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"email": email,
+	})
+	secretKey := utils.EnvVar("SECRET", "")
+	tokenString, err := token.SignedString([]byte(secretKey))
+	return tokenString, err
 }

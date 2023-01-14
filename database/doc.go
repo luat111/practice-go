@@ -10,11 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var collection *mongo.Database = nil
+var Database *mongo.Database = nil
 
 // GetConnection is for get mongo connection
 func GetConnection() *mongo.Database {
-	if collection == nil {
+	if Database == nil {
 		ctx, cancel:= context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -27,9 +27,9 @@ func GetConnection() *mongo.Database {
 		if err != nil {
 			log.Fatal(err)
 		} else {
-			collection = client.Database(dbName)
-			return collection
+			Database = client.Database(dbName)
+			return Database
 		}
 	}
-	return collection
+	return Database
 }

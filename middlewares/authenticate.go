@@ -12,10 +12,10 @@ import (
 //Authentication is for auth middleware
 func Authentication() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.Request.Header.Get("Authentication")
+		authHeader := c.Request.Header.Get("Authorization")
 		if len(authHeader) == 0 {
 			c.AbortWithStatusJSON(400, gin.H{
-				"error": "Authentication header is missing",
+				"error": "Authorization header is missing",
 			})
 			return
 		}
@@ -25,10 +25,7 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 		tokenString := strings.TrimSpace(temp[1])
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			// 	return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-			// }
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {			
 			secretKey := utils.EnvVar("TOKEN_KEY", "")
 			return []byte(secretKey), nil
 		})
@@ -40,9 +37,11 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			var userservice userModule.UserService
+
 			email := claims["email"].(string)
-			userservice := userModule.Userservice{}
 			user, err := userservice.FindByEmail(email)
+			
 			if err != nil {
 				c.AbortWithStatusJSON(402, gin.H{
 					"error": "User not found",

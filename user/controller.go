@@ -4,14 +4,11 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-
 	"golang.org/x/crypto/bcrypt"
 )
 
-//AuthController is for auth logic
 type AuthController struct{}
 
-//Login is to process login request
 func (auth *AuthController) Login(c *gin.Context) {
 
 	var loginInfo User
@@ -20,8 +17,8 @@ func (auth *AuthController) Login(c *gin.Context) {
 		return
 	}
 	//TODO
-	userservice := Userservice{}
-	user, errf := userservice.Find(&loginInfo)
+	userservice := UserService{}
+	user, errf := userservice.FindByEmail(loginInfo.Email)
 	if errf != nil {
 		c.AbortWithStatusJSON(401, gin.H{"error": "Not found"})
 		return
@@ -33,7 +30,7 @@ func (auth *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := user.GetJwtToken()
+	token, err := userservice.GetJwtToken(loginInfo.Email)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 		return
@@ -54,15 +51,16 @@ func (auth *AuthController) Profile(c *gin.Context) {
 	})
 }
 
-//Signup is for user signup
+type SignupInfo struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Name     string `json:"name"`
+}
+
+// Signup is for user signup
 func (auth *AuthController) Signup(c *gin.Context) {
 
-	type signupInfo struct {
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
-		Name     string `json:"name"`
-	}
-	var info signupInfo
+	var info SignupInfo
 	if err := c.ShouldBindJSON(&info); err != nil {
 		c.AbortWithStatusJSON(401, gin.H{"error": "Please input all fields"})
 		return
@@ -78,12 +76,14 @@ func (auth *AuthController) Signup(c *gin.Context) {
 
 	user.Password = string(hash)
 	user.Name = info.Name
-	userservice := Userservice{}
-	err = userservice.Create(&user)
+	userservice := UserService{}
+
+	result, err := userservice.Create(&user)
+
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 	} else {
-		c.JSON(200, gin.H{"result": "ok"})
+		c.JSON(200, result)
 	}
 	return
 }
