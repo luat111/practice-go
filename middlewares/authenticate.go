@@ -44,7 +44,7 @@ func Authentication() gin.HandlerFunc {
 			
 			if err != nil {
 				c.AbortWithStatusJSON(402, gin.H{
-					"error": "User not found",
+					"error": "User not found - Permission denied!",
 				})
 				return
 			}

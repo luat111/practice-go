@@ -4,12 +4,13 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthController struct{}
+type UserController struct{}
 
-func (auth *AuthController) Login(c *gin.Context) {
+func (userController *UserController) Login(c *gin.Context) {
 
 	var loginInfo User
 	if err := c.ShouldBindJSON(&loginInfo); err != nil {
@@ -30,7 +31,7 @@ func (auth *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := userservice.GetJwtToken(loginInfo.Email)
+	token, err := userservice.GetJwtToken(user.Email, user.Id)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": err.Error()})
 		return
@@ -41,11 +42,12 @@ func (auth *AuthController) Login(c *gin.Context) {
 	})
 }
 
-//Profile is to provide current user info
-func (auth *AuthController) Profile(c *gin.Context) {
+// Profile is to provide current user info
+func (userController *UserController) Profile(c *gin.Context) {
 	user := c.MustGet("user").(*(User))
 
 	c.JSON(200, gin.H{
+		"id":        user.Id,
 		"user_name": user.Name,
 		"email":     user.Email,
 	})
@@ -58,7 +60,7 @@ type SignupInfo struct {
 }
 
 // Signup is for user signup
-func (auth *AuthController) Signup(c *gin.Context) {
+func (userController *UserController) Signup(c *gin.Context) {
 
 	var info SignupInfo
 	if err := c.ShouldBindJSON(&info); err != nil {
@@ -85,5 +87,47 @@ func (auth *AuthController) Signup(c *gin.Context) {
 	} else {
 		c.JSON(200, result)
 	}
+	return
+}
+
+func (userController *UserController) Update(c *gin.Context) {
+	id, convertErr := primitive.ObjectIDFromHex(c.Param("id"))
+	if convertErr != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid ID"})
+	}
+
+	var payloadUpdate User
+	if err := c.ShouldBindJSON(&payloadUpdate); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	userservice := UserService{}
+	updatedUser, updateErr := userservice.Update(id, &payloadUpdate)
+	if updateErr != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": updateErr.Error()})
+		return
+	} else {
+		c.JSON(200, updatedUser)
+	}
+
+	return
+}
+
+func (userController *UserController) Remove(c *gin.Context) {
+	id, convertErr := primitive.ObjectIDFromHex(c.Param("id"))
+	if convertErr != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid ID"})
+	}
+
+	userservice := UserService{}
+	result, delErr := userservice.Remove(id)
+	if delErr != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": delErr.Error()})
+		return
+	} else {
+		c.JSON(200, result)
+	}
+
 	return
 }

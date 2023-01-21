@@ -12,5 +12,6 @@ func InitRoute() *gin.Engine {
 	router.Use(gin.Recovery())
 
 	setAuthRoute(router)
+	setUserRoute(router)
 	return router
 }
